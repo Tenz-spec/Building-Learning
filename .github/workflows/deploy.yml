@@ -1,0 +1,45 @@
+name: React CI/CD to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # This workflow runs on pushes to the 'main' branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # Use the latest Ubuntu environment
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Action to checkout your repository code
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Specify the Node.js version
+
+      - name: Install dependencies
+        run: npm ci # Use npm ci for clean install based on package-lock.json
+
+      - name: Build React app
+        run: npm run build # Runs the build script defined in your package.json
+
+      - name: Run tests (optional, but highly recommended)
+        run: npm test -- --coverage --watchAll=false # Run tests, disable watch mode for CI
+
+      # For Create React App: Modify package.json to set homepage for GitHub Pages
+      # This step is crucial if your app is hosted at github.io/repo-name/
+      - name: Adjust base path for GitHub Pages (CRA specific)
+        run: |
+          # Get repo name from GITHUB_REPOSITORY (e.g., 'YOUR_USERNAME/your-repo-name')
+          REPO_NAME=$(echo $GITHUB_REPOSITORY | awk -F '/' '{print $2}')
+          # Set homepage in package.json to /your-repo-name/
+          jq ".homepage = \"/${REPO_NAME}/\"" package.json > temp.json && mv temp.json package.json
+        if: success() && contains(github.repository, '/') # Only run if repo has a slash (user/repo)
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3 # Action to deploy to GitHub Pages
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # Automatically provided token
+          publish_dir: ./build # The directory to publish (where npm run build outputs)
+          # For Vite users, change publish_dir to ./dist
